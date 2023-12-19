@@ -1,6 +1,7 @@
 # Ref: https://github.com/gngpp/ninja/blob/main/doc/rest.http
 
 import requests
+from urllib.parse import urlparse, urlunparse
 import os, uuid, json
 from typing import Union
 
@@ -134,6 +135,133 @@ def get_chat_by_id(base_url:str, access_token:str, conversation_id:str):
     }
     response = requests.get(url, headers=headers)
     return response.json()
+
+def delete_chat(base_url:str, access_token:str, conversation_id:str):
+    """Delete chat by id
+
+    Args:
+        base_url (str): base url
+        access_token (str): access token at https://chat.openai.com/api/auth/session
+        conversation_id (str): conversation id
+    
+    Returns:
+        dict: response
+    
+    Rest API:
+        ### clear conversation by id
+        PATCH http://{{host}}/backend-api/conversation/5ae8355a-82a8-4ded-b0e4-ea5dc11b4a9f
+        Authorization: {{bearer_token}}
+        Content-Type: application/json
+
+        {
+            "is_visible": false
+        }
+    """
+    url = os.path.join(base_url, "backend-api/conversation", conversation_id)
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {access_token}'
+    }
+    data = {
+        "is_visible": False
+    }
+    response = requests.patch(url, headers=headers, data=json.dumps(data))
+    return response.json()
+
+def continue_chat( base_url:str, access_token:str
+                 , prompt:str
+                 , parent_message_id:Union[str, None]=None
+                 , conversation_id:Union[str, None]=None
+                 , model:str="text-davinci-002-render-sha"
+                 , history_and_training_disabled:bool=False):
+    """chat completion(create or edit)
+
+    Args:
+        base_url (str): base url
+        access_token (str): access token at https://chat.openai.com/api/auth/session
+        prompt (str): prompt
+        parent_message_id (str, optional): parent message id. Defaults to None.
+        conversation_id (str, optional): conversation id. Defaults to None.
+        model (str, optional): model. Defaults to "text-davinci-002-render-sha".
+        history_and_training_disabled (bool, optional): disable history record in the website. Defaults to False.
+    
+    Returns:
+        dict: chat
+    
+    Rest API:
+        ### new conversation
+        POST http://{{host}}/backend-api/conversation
+        Authorization: {{bearer_token}}
+        Content-Type: application/json
+        Accept: text/event-stream
+    
+    {
+        "action": "next",
+        "messages": [
+            {
+            "id": "{{$guid}}",
+            "author": {
+                "role": "user"
+            },
+            "content": {
+                "content_type": "text",
+                "parts": [
+                "new conversation"
+                ]
+            },
+            "metadata": {}
+            }
+        ],
+        "model": "text-davinci-002-render-sha-mobile",
+        "parent_message_id": "{{$guid}}",
+        "timezone_offset_min": -480,
+        "history_and_training_disabled": false
+    }
+    """
+    url = os.path.join(base_url, "backend-api/conversation")
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {access_token}',
+        'Accept': 'text/event-stream'
+    }
+    messages = [
+        {
+            "id": str(uuid.uuid4()),
+            "author": {"role": "user"},
+            "content": {"content_type": "text", "parts": [prompt]},
+        },
+    ]
+    data = {
+        "action": "next",
+        "messages": messages,
+        "conversation_id": conversation_id,
+        "parent_message_id": parent_message_id,
+        "model": model,
+        "history_and_training_disabled": history_and_training_disabled,
+    }
+    response = requests.post(url, headers=headers, data=json.dumps(data))
+    msg, info = response.text.split("data:")[-3:-1]
+    return json.loads(msg), json.loads(info)
+
+def create_chat( base_url:str, access_token:str
+               , prompt:str, model:str="text-davinci-002-render-sha"
+               , history_and_training_disabled:bool=False):
+    """Create chat
+
+    Args:
+        base_url (str): base url
+        access_token (str): access token at https://chat.openai.com/api/auth/session
+        prompt (str): prompt
+        model (str, optional): model. Defaults to "text-davinci-002-render-sha".
+        history_and_training_disabled (bool, optional): history and training disabled. Defaults to False.
+
+    Returns:
+        dict: chat
+    """
+    parent_id = str(uuid.uuid4())
+    return continue_chat( base_url, access_token
+                        , prompt, model, history_and_training_disabled, parent_id)
+
 
 def get_share_links(base_url:str, access_token:str, order:str="created"):
     """Get share links from backend-api
@@ -274,128 +402,40 @@ def generate_chat_title(base_url:str, access_token:str, conversation_id:str, mes
     response = requests.post(url, headers=headers, data=json.dumps(data))
     return response.json()
 
-def delete_chat(base_url:str, access_token:str, conversation_id:str):
-    """Delete chat by id
+
+## function inheriated from chattool
+
+def is_valid_url(url: str) -> bool:
+    """Check if the given URL is valid.
 
     Args:
-        base_url (str): base url
-        access_token (str): access token at https://chat.openai.com/api/auth/session
-        conversation_id (str): conversation id
-    
+        url (str): The URL to be checked.
+
     Returns:
-        dict: response
-    
-    Rest API:
-        ### clear conversation by id
-        PATCH http://{{host}}/backend-api/conversation/5ae8355a-82a8-4ded-b0e4-ea5dc11b4a9f
-        Authorization: {{bearer_token}}
-        Content-Type: application/json
-
-        {
-            "is_visible": false
-        }
+        bool: True if the URL is valid; otherwise False.
     """
-    url = os.path.join(base_url, "backend-api/conversation", conversation_id)
-    headers = {
-        'Content-Type': 'application/json',
-        'Authorization': f'Bearer {access_token}'
-    }
-    data = {
-        "is_visible": False
-    }
-    response = requests.patch(url, headers=headers, data=json.dumps(data))
-    return response.json()
+    parsed_url = urlparse(url)
+    return all([parsed_url.scheme, parsed_url.netloc])
 
-def continue_chat( base_url:str, access_token:str
-                 , prompt:str
-                 , parent_message_id:Union[str, None]=None
-                 , conversation_id:Union[str, None]=None
-                 , model:str="text-davinci-002-render-sha"
-                 , history_and_training_disabled:bool=False):
-    """chat completion(create or edit)
+def normalize_url(url: str) -> str:
+    """Normalize the given URL to a canonical form.
 
     Args:
-        base_url (str): base url
-        access_token (str): access token at https://chat.openai.com/api/auth/session
-        prompt (str): prompt
-        parent_message_id (str, optional): parent message id. Defaults to None.
-        conversation_id (str, optional): conversation id. Defaults to None.
-        model (str, optional): model. Defaults to "text-davinci-002-render-sha".
-        history_and_training_disabled (bool, optional): disable history record in the website. Defaults to False.
-    
-    Returns:
-        dict: chat
-    
-    Rest API:
-        ### new conversation
-        POST http://{{host}}/backend-api/conversation
-        Authorization: {{bearer_token}}
-        Content-Type: application/json
-        Accept: text/event-stream
-    
-    {
-        "action": "next",
-        "messages": [
-            {
-            "id": "{{$guid}}",
-            "author": {
-                "role": "user"
-            },
-            "content": {
-                "content_type": "text",
-                "parts": [
-                "new conversation"
-                ]
-            },
-            "metadata": {}
-            }
-        ],
-        "model": "text-davinci-002-render-sha-mobile",
-        "parent_message_id": "{{$guid}}",
-        "timezone_offset_min": -480,
-        "history_and_training_disabled": false
-    }
-    """
-    url = os.path.join(base_url, "backend-api/conversation")
-    headers = {
-        'Content-Type': 'application/json',
-        'Authorization': f'Bearer {access_token}',
-        'Accept': 'text/event-stream'
-    }
-    messages = [
-        {
-            "id": str(uuid.uuid4()),
-            "author": {"role": "user"},
-            "content": {"content_type": "text", "parts": [prompt]},
-        },
-    ]
-    data = {
-        "action": "next",
-        "messages": messages,
-        "conversation_id": conversation_id,
-        "parent_message_id": parent_message_id,
-        "model": model,
-        "history_and_training_disabled": history_and_training_disabled,
-    }
-    response = requests.post(url, headers=headers, data=json.dumps(data))
-    msg, info = response.text.split("data:")[-3:-1]
-    return json.loads(msg), json.loads(info)
-
-def create_chat( base_url:str, access_token:str
-               , prompt:str, model:str="text-davinci-002-render-sha"
-               , history_and_training_disabled:bool=False):
-    """Create chat
-
-    Args:
-        base_url (str): base url
-        access_token (str): access token at https://chat.openai.com/api/auth/session
-        prompt (str): prompt
-        model (str, optional): model. Defaults to "text-davinci-002-render-sha".
-        history_and_training_disabled (bool, optional): history and training disabled. Defaults to False.
+        url (str): The URL to be normalized.
 
     Returns:
-        dict: chat
+        str: The normalized URL.
+
+    Examples:
+        >>> normalize_url("http://api.example.com")
+        'http://api.example.com'
+
+        >>> normalize_url("api.example.com")
+        'https://api.example.com'
     """
-    parent_id = str(uuid.uuid4())
-    return continue_chat( base_url, access_token
-                        , prompt, model, history_and_training_disabled, parent_id)
+    url = url.replace("\\", '/') # compat to windows
+    parsed_url = urlparse(url)
+    if not parsed_url.scheme:
+        # If no scheme is specified, default to https protocol.
+        parsed_url = parsed_url._replace(scheme="https")
+    return urlunparse(parsed_url).replace("///", "//")
