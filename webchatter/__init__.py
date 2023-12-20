@@ -8,6 +8,7 @@ import os, dotenv, requests
 from typing import Union
 from . import request
 from .webchatter import WebChat, Node
+from .checkpoint import process_messages
 from pprint import pprint
 
 def load_envs(env:Union[None, str, dict]=None):

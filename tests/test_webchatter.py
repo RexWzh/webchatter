@@ -20,8 +20,10 @@ def test_askchat():
     # test chatlog
     chat_log = chat.chat_log
     assert len(chat_log) == 4
-    assert chat_log[0] == "It is nice today, ahhh"
-    assert chat_log[2] == "Tell me a joke about the weather."
+    assert chat_log[0] == {"role":"user", "content":"It is nice today, ahhh"}
+    assert chat_log[1]['role'] == "assistant"
+    assert chat_log[2] == {"role":"user", "content":"Tell me a joke about the weather."}
+    assert chat_log[3]['role'] == "assistant"
     newchat = WebChat(chat_id=chat.chat_id, node_id=chat.node_id)
     assert newchat.chat_log == chat_log
     # test store

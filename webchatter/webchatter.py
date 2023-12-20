@@ -120,7 +120,14 @@ class WebChat():
             chat_log.append(mapping[node_id].message)
             node_id = mapping[node_id].parent
         # remove the root node and tree node
-        return chat_log[-3::-1]
+        chat_log = chat_log[-3::-1]
+        chat_log_with_role = []
+        for ind, log in enumerate(chat_log):
+            if ind % 2 == 0:
+                chat_log_with_role.append({"role": "user", "content":log})
+            else:
+                chat_log_with_role.append({"role": "assistant", "content":log})
+        return chat_log_with_role
         
     def account_status(self):
         """Get the account status."""
@@ -171,7 +178,9 @@ class WebChat():
         if self.chat_id is None:
             # create four nodes
             tree_id, que_id = str(uuid.uuid4()), str(uuid.uuid4())
-            root_resp, ans_resp = chat_completion(url, token, message, que_id, tree_id)
+            root_resp, ans_resp = chat_completion(url, token, message, que_id, tree_id
+                                                 , history_and_training_disabled=not keep)
+            if not keep: return Node(ans_resp).message
             # update parent and children for these nodes
             root_resp['children'], root_resp['parent'] = [que_id], tree_id
             ans_resp['children'], ans_resp['parent'] = [], que_id
@@ -300,11 +309,8 @@ class WebChat():
     def print_log(self):
         """Print the chat log."""
         sep = '\n' + '-'*15 + '\n'
-        for i, msg in enumerate(self.chat_log):
-            if i % 2 == 0:
-                print(f"{sep}user{sep}{msg}\n")
-            else:
-                print(f"{sep}assistant{sep}{msg}\n")
+        for item in self.chat_log:
+            print(f"{sep}{item['role']}{sep}{item['content']}\n")
         return True
     
     def __repr__(self):
