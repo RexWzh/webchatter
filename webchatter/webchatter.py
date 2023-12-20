@@ -1,7 +1,7 @@
 """Main module."""
 
 from typing import Union
-import os, uuid
+import os, uuid, json
 import webchatter
 from .request import (
     get_account_status, get_models, get_beta_features,
@@ -221,6 +221,12 @@ class WebChat():
         except:
             raise Exception(f"Request failed with response: {resp}")
     
+    def chat_by_id(self, chat_id:str, node_id:Union[str, None]=None):
+        """Get the chat by id."""
+        chat = WebChat(self.base_url, self.backend_url, self.access_token)
+        chat._init_chat(chat_id, node_id)
+        return chat
+    
     def _init_chat(self, chat_id:str, node_id:Union[str, None]=None):
         """Initialize the chat."""
         url, token = self.backend_url, self.access_token
@@ -239,7 +245,7 @@ class WebChat():
             self._mapping = mapping
         except:
             raise Exception(f"Request failed with response: {resp}")
-        
+
     def regenerate(self, message:Union[str, None]=None):
         """Regenerate the chat."""
         # TODO
@@ -252,17 +258,54 @@ class WebChat():
         """Go to the parrent node."""
         # TODO
 
-    def save(self, filename:str):
+    def save( self, file:str
+            , mode:str='a'
+            , index:int=0
+            , chat_log_only:bool=True
+            , store_mapping:bool=False
+            , ):
         """Save the chat."""
-        # TODO
+        assert mode in ['a', 'w'], "saving mode should be 'a' or 'w'"
+        # make path if not exists
+        pathname = os.path.dirname(file).strip()
+        if pathname != '': os.makedirs(pathname, exist_ok=True)
+        
+        if chat_log_only:
+            data = {
+                "index": index,
+                "chat_log": self.chat_log,
+            }
+        else:
+            data = {
+                "index": index,
+                "chat_id": self.chat_id,
+                "node_id": self.node_id,
+                "access_token_hash": hash(self.access_token),
+                "mapping": self.mapping if store_mapping else None,
+                "chat_log": self.chat_log,
+            }
+        with open(file, mode, encoding='utf-8') as f:
+            f.write(json.dumps(data, ensure_ascii=False) + '\n')
+        return
     
-    def load(self, filename:str):
+    def load(self, path:str, check_mapping:bool=False):
         """Load the chat."""
-        # TODO
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.loads(f.read())
+        chat_id, node_id = data.get('chat_id'), data.get('node_id')
+        assert chat_id is not None, "The chat id is not set!"
+        # TODO: support more modes
+        return self.chat_by_id(chat_id, node_id)
     
     def print_log(self):
         """Print the chat log."""
-        # TODO
+        sep = '\n' + '-'*15 + '\n'
+        for i, msg in enumerate(self.chat_log):
+            if i % 2 == 0:
+                print(f"{sep}user{sep}{msg}\n")
+            else:
+                print(f"{sep}assistant{sep}{msg}\n")
+        return True
     
     def __repr__(self):
         """Representation."""
