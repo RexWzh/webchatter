@@ -3,7 +3,7 @@
 """The setup script."""
 
 from setuptools import setup, find_packages
-version='0.1.0'
+VERSION = '0.1.1'
 
 with open('README.md') as readme_file:
     readme = readme_file.read()
@@ -29,7 +29,7 @@ setup(
     description="Wrapper of the web server of ChatGPT",
     install_requires=requirements,
     license="MIT license",
-    long_description=readme,
+    # long_description=readme,
     include_package_data=True,
     keywords='webchatter',
     name='webchatter',
@@ -37,6 +37,6 @@ setup(
     test_suite='tests',
     tests_require=test_requirements,
     url='https://github.com/RexWzh/webchatter',
-    version='0.1.0',
+    version=VERSION,
     zip_safe=False,
 )

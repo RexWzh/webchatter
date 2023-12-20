@@ -6,7 +6,7 @@ import webchatter
 from .request import (
     get_account_status, get_models, get_beta_features,
     get_chat_list, get_chat_by_id, 
-    chat_completion, delete_chat,
+    chat_completion, delete_chat, get_conversation_limit
 )
 
 class Node():
@@ -152,6 +152,11 @@ class WebChat():
         url, token = self.backend_url, self.access_token
         return get_beta_features(url, token)
     
+    def conversation_limit(self):
+        """Get converation limitation"""
+        url, token = self.base_url, self.access_token
+        return get_conversation_limit(url, token)
+
     def chat_list(self, offset:int=0, limit:int=3, order:str="updated"):
         """Get the chat list."""
         url, token = self.backend_url, self.access_token

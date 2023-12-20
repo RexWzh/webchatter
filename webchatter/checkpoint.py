@@ -1,15 +1,21 @@
 import os, json
 from webchatter import WebChat
 import tqdm, tqdm.notebook
+import time
 # from chattool import load_chats
 
-def process_messages(msgs, checkpoint:str, mode:str="delete", isjupyter:bool=False):
+def process_messages( msgs
+                    , checkpoint:str
+                    , time_interval:int=5
+                    , max_tries:int=-1
+                    , isjupyter:bool=False
+                    , interval_rate:float=1
+                    ):
     """Process the messages.
     
     Args:
         msgs (list): The messages.
         checkpoint (str): Store the checkpoint.
-        mode (str, optional): One of the three mode: delete, repeat, newchat. Defaults to "delete".
 
     Returns:
         list: The processed messages.
@@ -21,13 +27,22 @@ def process_messages(msgs, checkpoint:str, mode:str="delete", isjupyter:bool=Fal
         if len(processed) >= 1 and processed[0] != '':
             offset = len(processed)
     tq = tqdm.tqdm if not isjupyter else tqdm.notebook.tqdm
-    with open(checkpoint, 'a', encoding='utf-8') as f:    
+    chat = WebChat()
+    with open(checkpoint, 'a', encoding='utf-8') as f:
         for ind in tq(range(offset, len(msgs))):
-            msg = msgs[ind]
-            chat = WebChat()
-            ans = chat.ask(msg, keep=False)
-            data = {"index":ind + offset, "chat_log":{"user":msg, "assistant":ans}}
-            f.write(json.dumps(data) + '\n')
+            wait_time = time_interval
+            while max_tries:
+                try:
+                    msg = msgs[ind]
+                    ans = chat.ask(msg, keep=False)
+                    data = {"index":ind + offset, "chat_log":{"user":msg, "assistant":ans}}
+                    f.write(json.dumps(data) + '\n')
+                    break
+                except Exception as e:
+                    print(ind, e)
+                    max_tries -= 1
+                    time.sleep(wait_time)
+                    wait_time = wait_time * interval_rate
     return True
 
 def process_chats(chats, checkpoint:str):
