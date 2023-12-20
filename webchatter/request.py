@@ -168,19 +168,21 @@ def delete_chat(backend_url:str, access_token:str, conversation_id:str):
     response = requests.patch(url, headers=headers, data=json.dumps(data))
     return response.json()
 
-def continue_chat( backend_url:str, access_token:str
-                 , prompt:str
-                 , parent_message_id:Union[str, None]=None
-                 , conversation_id:Union[str, None]=None
-                 , model:str="text-davinci-002-render-sha"
-                 , history_and_training_disabled:bool=False):
+def chat_completion( backend_url:str, access_token:str
+                   , prompt:str
+                   , current_message_id:str
+                   , parent_message_id:str
+                   , conversation_id:Union[str, None]=None
+                   , model:str="text-davinci-002-render-sha"
+                   , history_and_training_disabled:bool=False):
     """chat completion(create or edit)
 
     Args:
         backend_url (str): backend url
         access_token (str): access token at https://chat.openai.com/api/auth/session
         prompt (str): prompt
-        parent_message_id (str, optional): parent message id. Defaults to None.
+        current_message_id (str): current message id. You can use uuid.uuid4() to generate one.
+        parent_message_id (str): parent message id.
         conversation_id (str, optional): conversation id. Defaults to None.
         model (str, optional): model. Defaults to "text-davinci-002-render-sha".
         history_and_training_disabled (bool, optional): disable history record in the website. Defaults to False.
@@ -226,7 +228,7 @@ def continue_chat( backend_url:str, access_token:str
     }
     messages = [
         {
-            "id": str(uuid.uuid4()),
+            "id": current_message_id,
             "author": {"role": "user"},
             "content": {"content_type": "text", "parts": [prompt]},
         },
@@ -240,27 +242,13 @@ def continue_chat( backend_url:str, access_token:str
         "history_and_training_disabled": history_and_training_disabled,
     }
     response = requests.post(url, headers=headers, data=json.dumps(data))
-    msg, info = response.text.split("data:")[-3:-1]
-    return json.loads(msg), json.loads(info)
+    resps = response.text.split("data:")
+    try:
+        first_msg, last_msg = resps[1], resps[-3]
+    except:
+        raise Exception(f"Request failed with response: {response.text}")
+    return json.loads(first_msg), json.loads(last_msg)
 
-def create_chat( backend_url:str, access_token:str
-               , prompt:str, model:str="text-davinci-002-render-sha"
-               , history_and_training_disabled:bool=False):
-    """Create chat
-
-    Args:
-        backend_url (str): backend url
-        access_token (str): access token at https://chat.openai.com/api/auth/session
-        prompt (str): prompt
-        model (str, optional): model. Defaults to "text-davinci-002-render-sha".
-        history_and_training_disabled (bool, optional): history and training disabled. Defaults to False.
-
-    Returns:
-        dict: chat
-    """
-    parent_id = str(uuid.uuid4())
-    return continue_chat( backend_url, access_token
-                        , prompt, model, history_and_training_disabled, parent_id)
 
 def get_share_links(backend_url:str, access_token:str, order:str="created"):
     """Get share links from backend-api

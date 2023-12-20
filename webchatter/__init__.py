@@ -7,6 +7,7 @@ __version__ = '0.1.0'
 import os, dotenv, requests
 from typing import Union
 from . import request
+from .webchatter import WebChat, Node
 
 def load_envs(env:Union[None, str, dict]=None):
     """Read the environment variables for the API call"""
@@ -19,11 +20,16 @@ def load_envs(env:Union[None, str, dict]=None):
         for key, value in env.items():
             os.environ[key] = value
     # initialize the variables
+    ## access token
     access_token = os.getenv("OPENAI_ACCESS_TOKEN")
+    ## base url
     base_url = os.getenv("API_REVERSE_PROXY")
     if base_url is not None:
         base_url = request.normalize_url(base_url)
+    ## backend url
     backend_url = os.getenv("WEB_REVERSE_PROXY")
+    if backend_url is None and base_url is not None:
+        backend_url = os.path.join(base_url, "backend-api")
     if backend_url is not None:
         backend_url = request.normalize_url(backend_url)
     return True
@@ -57,7 +63,9 @@ def debug_log( net_url:str="https://www.baidu.com"
     """
     # Network test
     try:
+        print("\nCheck your network:")
         requests.get(net_url, timeout=timeout)
+        print("Network is available.")
     except:
         print("Warning: Network is not available.")
         return False
@@ -65,6 +73,10 @@ def debug_log( net_url:str="https://www.baidu.com"
     ## Base url
     print("\nCheck your base url:")
     print(base_url)
+
+    ## Backend url
+    print("\nCheck your backend url:")
+    print(backend_url)
 
 
     print("\nDebug is finished.")
