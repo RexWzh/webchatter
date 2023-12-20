@@ -3,6 +3,7 @@
 """The setup script."""
 
 from setuptools import setup, find_packages
+version='0.1.0'
 
 with open('README.md') as readme_file:
     readme = readme_file.read()
@@ -36,6 +37,6 @@ setup(
     test_suite='tests',
     tests_require=test_requirements,
     url='https://github.com/RexWzh/webchatter',
-    version='0.0.1',
+    version='0.1.0',
     zip_safe=False,
 )
