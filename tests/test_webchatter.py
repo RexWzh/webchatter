@@ -24,6 +24,9 @@ def test_askchat():
     assert chat_log[2] == "Tell me a joke about the weather."
     newchat = WebChat(chat_id=chat.chat_id, node_id=chat.node_id)
     assert newchat.chat_log == chat_log
+    # test store
+    chat.save("joke.json")
+    chat.save("joke-with-id.json", chat_log_only=False)
 
 def test_envs():
     """Test the environment variables."""

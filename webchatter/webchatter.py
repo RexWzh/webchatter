@@ -157,7 +157,7 @@ class WebChat():
     def num_of_chats(self):
         """Get the number of chats."""
         url, token = self.backend_url, self.access_token
-        resp = get_chat_list(url, token)
+        resp = get_chat_list(url, token, limit=1)
         try:
             return resp['total']
         except:
