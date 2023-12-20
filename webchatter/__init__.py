@@ -10,7 +10,7 @@ from . import request
 
 def load_envs(env:Union[None, str, dict]=None):
     """Read the environment variables for the API call"""
-    global access_token, base_url
+    global access_token, base_url, backend_url
     # update the environment variables
     if isinstance(env, str):
         # load the environment file
@@ -20,16 +20,21 @@ def load_envs(env:Union[None, str, dict]=None):
             os.environ[key] = value
     # initialize the variables
     access_token = os.getenv("OPENAI_ACCESS_TOKEN")
-    base_url = os.getenv("API_REVERSE_PROXY")    
-    base_url = request.normalize_url(base_url)
+    base_url = os.getenv("API_REVERSE_PROXY")
+    if base_url is not None:
+        base_url = request.normalize_url(base_url)
+    backend_url = os.getenv("WEB_REVERSE_PROXY")
+    if backend_url is not None:
+        backend_url = request.normalize_url(backend_url)
     return True
 
 def save_envs(env_file:str):
     """Save the environment variables for the API call"""
-    global access_token, base_url
+    global access_token, base_url, backend_url
     with open(env_file, "w") as f:
         f.write(f"OPENAI_ACCESS_TOKEN={access_token}\n")
         f.write(f"API_REVERSE_PROXY={base_url}\n")
+        f.write(f"WEB_REVERSE_PROXY={backend_url}\n")
     return True
 
 # load the environment variables
