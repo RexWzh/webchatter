@@ -1,7 +1,7 @@
 """Main module."""
 
 from typing import Union
-import os, uuid
+import os, uuid, json
 import webchatter
 from .request import (
     get_account_status, get_models, get_beta_features,
@@ -105,26 +105,39 @@ class WebChat():
         self._chat_id = chat_id
         # Tree structure
         self._node_id = node_id # the answer node
-        self._root_id, self._tree_id, self._que_id = None, None, None
-        self._mapping = {}
+        if chat_id is not None:
+            self._init_chat(chat_id, node_id)
+        else:
+            self._root_id, self._tree_id, self._que_id = None, None, None
+            self._mapping = {}
     
     @property
     def chat_log(self):
         """Get the chat log."""
         node_id, mapping = self.node_id, self.mapping
-        if node_id is None: return []
-        # TODO
+        chat_log = []
+        while node_id is not None:
+            chat_log.append(mapping[node_id].message)
+            node_id = mapping[node_id].parent
+        # remove the root node and tree node
+        return chat_log[-3::-1]
         
     def account_status(self):
         """Get the account status."""
         url, token = self.backend_url, self.access_token
-        resp = get_account_status(url, token)
-        return resp['account_plan']
+        try:
+            resp = get_account_status(url, token)
+            return resp['account_plan']
+        except:
+            raise Exception(f"Request failed with response: {resp}")
     
     def valid_models(self):
         """Get the models."""
         url, token = self.backend_url, self.access_token
-        resp = get_models(url, token)
+        try:
+            resp = get_models(url, token)
+        except:
+            raise Exception(f"Request failed with response: {resp}")
         return [model['category'] for model in resp["categories"]]
     
     def beta_features(self):
@@ -136,13 +149,19 @@ class WebChat():
         """Get the chat list."""
         url, token = self.backend_url, self.access_token
         resp = get_chat_list(url, token, offset=offset, limit=limit, order=order)
-        return [{'conversation_id':item['id'],'title': item['title']} for item in resp['items']]
+        try:
+            return [{'conversation_id':item['id'],'title': item['title']} for item in resp['items']]
+        except:
+            raise Exception(f"Request failed with response: {resp}")
     
     def num_of_chats(self):
         """Get the number of chats."""
         url, token = self.backend_url, self.access_token
-        resp = get_chat_list(url, token)
-        return resp['total']
+        resp = get_chat_list(url, token, limit=1)
+        try:
+            return resp['total']
+        except:
+            raise Exception(f"Request failed with response: {resp}")
     
     def ask( self, message:str
            , keep:bool=True):
@@ -172,23 +191,22 @@ class WebChat():
             self._node_id, self._que_id = ans_node.node_id, que_node.node_id
             self._mapping = {
                 tree_id: tree_node, root_node.node_id: root_node,
-                ans_node.node_id: ans_node, que_node.node_id: que_node
-            }
+                ans_node.node_id: ans_node, que_node.node_id: que_node}
         else: # update ans_node and que_node
-            que_id = str(uuid.uuid4())
-            _, ans_resp = chat_completion(url, token, message, que_id, self.node_id, self.chat_id)
+            que_id, pre_ans_id = str(uuid.uuid4()), self.node_id
+            _, ans_resp = chat_completion(url, token, message, que_id, pre_ans_id, self.chat_id)
             ans_resp['parent'] = que_id
             ans_node = Node(ans_resp)
+            ans_id = ans_node.node_id
             que_node = Node({
                 "id": que_id, "message": message,
-                "children": [ans_node.node_id], "parent": self.node_id})
+                "children": [ans_id], "parent": pre_ans_id})
             # add children to the previous node
-            self._mapping[self.node_id].children.append(que_id)
+            self._mapping[pre_ans_id].children.append(que_id)
             # update node id and que id
-            self._node_id, self._que_id = ans_node.node_id, que_node.node_id
+            self._node_id, self._que_id = ans_id, que_id
             # update mapping
-            self._mapping[ans_node.node_id] = ans_node
-            self._mapping[que_node.node_id] = que_node
+            self._mapping[ans_id], self._mapping[que_id] = ans_node, que_node
         # return the answer
         return ans_node.message
 
@@ -198,15 +216,35 @@ class WebChat():
         chat_id = chat_id or self.chat_id
         assert chat_id is not None, "The chat id is not set!"
         resp = get_chat_by_id(url, token, chat_id)
-        return {key: Node(node) for key, node in resp['mapping'].items()}
+        try:
+            return {key: Node(node) for key, node in resp['mapping'].items()}
+        except:
+            raise Exception(f"Request failed with response: {resp}")
     
-    def newchat_by_id(self, conversation_id:Union[str, None]=None):
+    def chat_by_id(self, chat_id:str, node_id:Union[str, None]=None):
         """Get the chat by id."""
+        chat = WebChat(self.base_url, self.backend_url, self.access_token)
+        chat._init_chat(chat_id, node_id)
+        return chat
+    
+    def _init_chat(self, chat_id:str, node_id:Union[str, None]=None):
+        """Initialize the chat."""
         url, token = self.backend_url, self.access_token
-        conversation_id = conversation_id or self.conversation_id
-        resp = get_chat_by_id(url, token, conversation_id)
-        # TODO: extract the chat history
-        return WebChat(base_url=url, access_token=token, conversation_id=conversation_id)
+        resp = get_chat_by_id(url, token, chat_id)
+        try:
+            if node_id is None: node_id = resp['current_node']
+            mapping = {}
+            for key, val in resp['mapping'].items():
+                node = Node(val)
+                mapping[key] = node
+                if node.parent is None: tree_id = key
+                if node_id in node.children: que_id = key
+            root_id = mapping[tree_id].children[0]
+            self._root_id, self._tree_id = root_id, tree_id
+            self._que_id, self._node_id = que_id, node_id
+            self._mapping = mapping
+        except:
+            raise Exception(f"Request failed with response: {resp}")
 
     def regenerate(self, message:Union[str, None]=None):
         """Regenerate the chat."""
@@ -220,17 +258,54 @@ class WebChat():
         """Go to the parrent node."""
         # TODO
 
-    def save(self, filename:str):
+    def save( self, file:str
+            , mode:str='a'
+            , index:int=0
+            , chat_log_only:bool=True
+            , store_mapping:bool=False
+            , ):
         """Save the chat."""
-        # TODO
+        assert mode in ['a', 'w'], "saving mode should be 'a' or 'w'"
+        # make path if not exists
+        pathname = os.path.dirname(file).strip()
+        if pathname != '': os.makedirs(pathname, exist_ok=True)
+        
+        if chat_log_only:
+            data = {
+                "index": index,
+                "chat_log": self.chat_log,
+            }
+        else:
+            data = {
+                "index": index,
+                "chat_id": self.chat_id,
+                "node_id": self.node_id,
+                "access_token_hash": hash(self.access_token),
+                "mapping": self.mapping if store_mapping else None,
+                "chat_log": self.chat_log,
+            }
+        with open(file, mode, encoding='utf-8') as f:
+            f.write(json.dumps(data, ensure_ascii=False) + '\n')
+        return
     
-    def load(self, filename:str):
+    def load(self, path:str, check_mapping:bool=False):
         """Load the chat."""
-        # TODO
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.loads(f.read())
+        chat_id, node_id = data.get('chat_id'), data.get('node_id')
+        assert chat_id is not None, "The chat id is not set!"
+        # TODO: support more modes
+        return self.chat_by_id(chat_id, node_id)
     
     def print_log(self):
         """Print the chat log."""
-        # TODO
+        sep = '\n' + '-'*15 + '\n'
+        for i, msg in enumerate(self.chat_log):
+            if i % 2 == 0:
+                print(f"{sep}user{sep}{msg}\n")
+            else:
+                print(f"{sep}assistant{sep}{msg}\n")
+        return True
     
     def __repr__(self):
         """Representation."""

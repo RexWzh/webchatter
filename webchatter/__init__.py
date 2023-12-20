@@ -8,6 +8,7 @@ import os, dotenv, requests
 from typing import Union
 from . import request
 from .webchatter import WebChat, Node
+from pprint import pprint
 
 def load_envs(env:Union[None, str, dict]=None):
     """Read the environment variables for the API call"""
@@ -63,7 +64,7 @@ def debug_log( net_url:str="https://www.baidu.com"
     """
     # Network test
     try:
-        print("\nCheck your network:")
+        print("\nChecking your network:")
         requests.get(net_url, timeout=timeout)
         print("Network is available.")
     except:
@@ -77,6 +78,11 @@ def debug_log( net_url:str="https://www.baidu.com"
     ## Backend url
     print("\nCheck your backend url:")
     print(backend_url)
+
+    ## acount status
+    print("\nCheck your account status:")
+    chat = WebChat()
+    pprint(chat.account_status())
 
 
     print("\nDebug is finished.")
