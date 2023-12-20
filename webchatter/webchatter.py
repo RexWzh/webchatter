@@ -283,7 +283,6 @@ class WebChat():
         # make path if not exists
         pathname = os.path.dirname(file).strip()
         if pathname != '': os.makedirs(pathname, exist_ok=True)
-        
         if chat_log_only:
             data = {
                 "index": index,

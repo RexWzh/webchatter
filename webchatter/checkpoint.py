@@ -1,15 +1,32 @@
-import os, json
+import os, json, warnings, time
 from webchatter import WebChat
 import tqdm, tqdm.notebook
-import time
+from chattool import load_chats, Chat
+from typing import List, Callable
 # from chattool import load_chats
 
-def process_messages( msgs
+def try_sth(func:Callable, max_tries:int, interval:float, *args, **kwargs):
+    """Try something.
+    
+    Args:
+        func (Callable): The function to try.
+        max_tries (int): The maximum number of tries.
+        interval (float): The interval between tries.
+    """
+    while max_tries:
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            print(e)
+            max_tries -= 1
+            time.sleep(interval)
+    return None
+
+def process_messages( msgs:List[str]
                     , checkpoint:str
-                    , time_interval:int=5
+                    , interval:int=5
                     , max_tries:int=-1
                     , isjupyter:bool=False
-                    , interval_rate:float=1
                     ):
     """Process the messages.
     
@@ -17,33 +34,26 @@ def process_messages( msgs
         msgs (list): The messages.
         checkpoint (str): Store the checkpoint.
 
+
     Returns:
         list: The processed messages.
     """
-    offset = 0
-    if os.path.exists(checkpoint):
-        with open(checkpoint, 'r', encoding='utf-8') as f:
-            processed = f.read().strip().split('\n')
-        if len(processed) >= 1 and processed[0] != '':
-            offset = len(processed)
+    chats = load_chats(checkpoint)
+    if len(chats) > len(msgs):
+        warnings.warn(f"checkpoint file {checkpoint} has more chats than the data to be processed")
+        return chats[:len(msgs)]
+    chats.extend([None] * (len(msgs) - len(chats)))
     tq = tqdm.tqdm if not isjupyter else tqdm.notebook.tqdm
-    chat = WebChat()
-    with open(checkpoint, 'a', encoding='utf-8') as f:
-        for ind in tq(range(offset, len(msgs))):
-            wait_time = time_interval
-            while max_tries:
-                try:
-                    msg = msgs[ind]
-                    ans = chat.ask(msg, keep=False)
-                    data = {"index":ind + offset, "chat_log":{"user":msg, "assistant":ans}}
-                    f.write(json.dumps(data) + '\n')
-                    break
-                except Exception as e:
-                    print(ind, e)
-                    max_tries -= 1
-                    time.sleep(wait_time)
-                    wait_time = wait_time * interval_rate
-    return True
+    # process chats
+    webchat, chat = WebChat(), Chat()
+    for ind in tq(range(len(chats))):
+        if chats[ind] is not None: continue
+        ans = try_sth(webchat.ask, max_tries, interval, msgs[ind])
+        chat = Chat(msgs[ind])
+        chat.assistant(ans)
+        chat.save(checkpoint, mode='a', index=ind)
+        chats[ind] = chat
+    return chats
 
 def process_chats(chats, checkpoint:str):
     """Process the chats.

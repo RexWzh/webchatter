@@ -35,7 +35,7 @@ from random import randint
 
 msgs = [f"find the result of {randint(3, 100)} + {randint(4, 100)}" for _ in range(4)]
 # Annotate some data and get interrupted
-process_messages(msgs[:2], "test.jsonl", time_interval=5, max_tries=3)
+process_messages(msgs[:2], "test.jsonl", interval=5, max_tries=3)
 # Continue annotation
 process_messages(msgs, "test.jsonl")
 ```
